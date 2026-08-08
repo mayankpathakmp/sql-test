@@ -550,49 +550,6 @@ export default function App() {
             </div>
           </>
         ) : null}
-          {showReview ? 'Hide full report ▴' : 'View full report ▾'}
-        </button>
-        <div id="review-wrap" className={showReview ? 'show' : ''}>
-          <div className="review-list" id="review-list">
-            {activeQueue.map((q) => {
-              const answer = answers[q.num];
-              const wasCorrect = answer?.correct;
-              const yourText = answer?.selected ? q.options[LETTERS.indexOf(answer.selected)] : 'Skipped';
-              const correctText = q.options[LETTERS.indexOf(q.answer)];
-              const reasonText = q.explanation
-                ? q.explanation
-                : `Because this is a ${sectionFor(q.num).toLowerCase()} question, the correct choice is ${q.answer}) ${correctText}.`;
-              return (
-                <div className={`review-item ${wasCorrect ? 'right' : 'wrong'}`} key={q.num}>
-                  <div className="ri-head">
-                    <span>Q{q.num} · {sectionFor(q.num)}</span>
-                    <span>{wasCorrect ? '✓ correct' : '✗ review'}</span>
-                  </div>
-                  <div className="ri-q">{q.text}</div>
-                  {q.code ? (
-                    <div className="q-code review-code">
-                      <pre dangerouslySetInnerHTML={{ __html: highlightSQL(q.code) }} />
-                    </div>
-                  ) : null}
-                  <div className="ri-ans">
-                    <div className="review-row">
-                      <span className="ri-label">Your answer:</span>
-                      <span>{answer?.selected ? `${answer.selected}) ${yourText}` : 'Skipped'}</span>
-                    </div>
-                    <div className="review-row">
-                      <span className="ri-label">Correct answer:</span>
-                      <span>{q.answer}) {correctText}</span>
-                    </div>
-                    <div className="review-row reason">
-                      <span className="ri-label">Reason:</span>
-                      <span>{reasonText}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
         <div className="results-actions">
           <button className="btn primary" id="retry-btn" type="button" onClick={handleRetry}>
