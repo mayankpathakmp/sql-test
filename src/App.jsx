@@ -1,0 +1,484 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { QUESTIONS, SECTIONS } from './data';
+import './App.css';
+
+const STORAGE_KEY = 'sql_query_bench_v1';
+const TOTAL_SECONDS = 30 * 60;
+const LETTERS = ['A', 'B', 'C', 'D'];
+
+function sectionFor(num) {
+  return SECTIONS.find((s) => num >= s.from && num <= s.to)?.name || 'General';
+}
+
+function highlightSQL(code) {
+  const kws = [
+    'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'DATABASE',
+    'ALTER', 'DROP', 'TRUNCATE', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CHECK', 'GROUP', 'BY', 'HAVING', 'ORDER',
+    'ASC', 'DESC', 'LIMIT', 'OFFSET', 'JOIN', 'INNER', 'LEFT', 'RIGHT', 'FULL', 'OUTER', 'ON', 'UNION', 'ALL', 'AND',
+    'OR', 'NOT', 'NULL', 'IN', 'BETWEEN', 'LIKE', 'IS', 'DISTINCT', 'AS', 'CASCADE', 'COLUMN', 'ADD', 'MODIFY',
+    'RENAME', 'TO', 'IF', 'EXISTS', 'COUNT', 'AVG', 'SUM', 'MAX', 'MIN',
+  ];
+  const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const re = new RegExp('\\b(' + kws.join('|') + ')\\b', 'g');
+  return escaped.replace(re, '<span class="kw">$1</span>');
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      current: typeof parsed.current === 'number' ? parsed.current : 0,
+      answers: typeof parsed.answers === 'object' && parsed.answers ? parsed.answers : {},
+      remainingSeconds:
+        typeof parsed.remainingSeconds === 'number' ? parsed.remainingSeconds : TOTAL_SECONDS,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveState(state) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (e) {
+    // ignore storage failures
+  }
+}
+
+export default function App() {
+  const [screen, setScreen] = useState('intro');
+  const [current, setCurrent] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [remainingSeconds, setRemainingSeconds] = useState(TOTAL_SECONDS);
+  const [activeQueue, setActiveQueue] = useState(QUESTIONS);
+  const [resumeCount, setResumeCount] = useState(0);
+  const [showReview, setShowReview] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    const saved = loadState();
+    if (saved && Object.keys(saved.answers).length > 0) {
+      setCurrent(saved.current);
+      setAnswers(saved.answers);
+      setRemainingSeconds(saved.remainingSeconds);
+      setResumeCount(Object.keys(saved.answers).length);
+      if (Object.keys(saved.answers).length < QUESTIONS.length) {
+        setScreen('quiz');
+      } else {
+        setScreen('results');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    saveState({ current, answers, remainingSeconds });
+  }, [current, answers, remainingSeconds]);
+
+  useEffect(() => {
+    if (screen !== 'quiz') {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+          finishQuiz();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [screen]);
+
+  const activeQuestion = activeQueue[current];
+  const answeredCount = Object.keys(answers).length;
+  const correctCount = Object.values(answers).filter((item) => item.correct).length;
+  const progressPercent = activeQueue.length ? (current / activeQueue.length) * 100 : 0;
+  const timerMinutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+  const timerSeconds = String(remainingSeconds % 60).padStart(2, '0');
+
+  const gradeData = useMemo(() => {
+    const pct = Math.round((correctCount / activeQueue.length) * 100);
+    if (pct >= 90) {
+      return {
+        grade: 'Excellent — mastery level',
+        note:
+          'You clearly know your way around a schema. Revisit any misses below, then move on to harder query-writing practice.',
+        color: '#7ee787',
+        pct,
+      };
+    }
+    if (pct >= 70) {
+      return {
+        grade: 'Solid — minor gaps',
+        note: 'Good grasp of the fundamentals. Check the weak-spot breakdown below and re-read those sections.',
+        color: '#4fd6c4',
+        pct,
+      };
+    }
+    if (pct >= 50) {
+      return {
+        grade: 'Getting there',
+        note: 'You have the basics but several sections need review. Focus on the lowest-scoring topics below.',
+        color: '#e3b341',
+        pct,
+      };
+    }
+    return {
+      grade: 'Needs a re-run',
+      note: 'Worth revisiting the fundamentals doc from the top before retaking this test.',
+      color: '#ff7b72',
+      pct,
+    };
+  }, [correctCount, activeQueue.length]);
+
+  const summaryBySection = useMemo(() => {
+    const bySection = {};
+    SECTIONS.forEach((section) => {
+      bySection[section.name] = { correct: 0, total: 0 };
+    });
+    activeQueue.forEach((q) => {
+      const sectionName = sectionFor(q.num);
+      if (!bySection[sectionName]) bySection[sectionName] = { correct: 0, total: 0 };
+      bySection[sectionName].total += 1;
+      const answer = answers[q.num];
+      if (answer && answer.correct) bySection[sectionName].correct += 1;
+    });
+    return Object.entries(bySection).filter(([, value]) => value.total > 0);
+  }, [answers, activeQueue]);
+
+  const handleStart = () => {
+    setActiveQueue(QUESTIONS);
+    setCurrent(0);
+    setAnswers({});
+    setRemainingSeconds(TOTAL_SECONDS);
+    localStorage.removeItem(STORAGE_KEY);
+    setScreen('quiz');
+    setShowReview(false);
+  };
+
+  const handleResume = () => {
+    setScreen('quiz');
+    setShowReview(false);
+  };
+
+  const handleRestartFresh = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setActiveQueue(QUESTIONS);
+    setCurrent(0);
+    setAnswers({});
+    setRemainingSeconds(TOTAL_SECONDS);
+    setScreen('quiz');
+    setShowReview(false);
+  };
+
+  const handleSelect = (letter) => {
+    if (answers[activeQuestion.num]) return;
+    const correct = letter === activeQuestion.answer;
+    const nextAnswers = {
+      ...answers,
+      [activeQuestion.num]: { selected: letter, correct },
+    };
+    setAnswers(nextAnswers);
+  };
+
+  const finishQuiz = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    setScreen('results');
+  };
+
+  const handlePrev = () => {
+    if (current > 0) setCurrent((prev) => prev - 1);
+  };
+
+  const handleNext = () => {
+    if (current < activeQueue.length - 1) {
+      setCurrent((prev) => prev + 1);
+    } else {
+      finishQuiz();
+    }
+  };
+
+  const handleRetry = () => {
+    setActiveQueue(QUESTIONS);
+    setCurrent(0);
+    setAnswers({});
+    setRemainingSeconds(TOTAL_SECONDS);
+    localStorage.removeItem(STORAGE_KEY);
+    setScreen('quiz');
+    setShowReview(false);
+  };
+
+  const handleRetryWrong = () => {
+    const missed = QUESTIONS.filter((q) => {
+      const answer = answers[q.num];
+      return !answer || !answer.correct;
+    });
+    if (missed.length === 0) {
+      alert('No missed questions — nice work!');
+      return;
+    }
+    setActiveQueue(missed);
+    setCurrent(0);
+    setAnswers({});
+    setRemainingSeconds(TOTAL_SECONDS);
+    localStorage.removeItem(STORAGE_KEY);
+    setScreen('quiz');
+    setShowReview(false);
+  };
+
+  const currentAnswer = answers[activeQuestion?.num];
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="brand">
+          <div className="dot-row">
+            <span className="dot r" />
+            <span className="dot y" />
+            <span className="dot g" />
+          </div>
+          <div className="brand-name">
+            <b>query_bench</b> — sql_100.session
+          </div>
+        </div>
+        <div className="conn-status">
+          <span className="pulse" />connected
+        </div>
+      </div>
+
+      <section className={screen === 'intro' ? 'screen active' : 'screen'} id="intro">
+        <div className="query-line">
+          <span className="kw">SELECT</span> * <span className="kw">FROM</span> sql_fundamentals <span className="kw">LIMIT</span> 100;
+        </div>
+        <h1>
+          Test your <span className="accentword">SQL</span> fundamentals.
+        </h1>
+        <p className="lead">
+          100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end. You have 30 minutes to complete the full quiz.
+        </p>
+
+        <div className="schema-panel">
+          <div className="row">
+            <span className="col-name">questions</span>
+            <span className="col-type">100 rows</span>
+          </div>
+          <div className="row">
+            <span className="col-name">format</span>
+            <span className="col-type">single-select · 4 options</span>
+          </div>
+          <div className="row">
+            <span className="col-name">topics</span>
+            <span className="col-type">21 sections · keys, joins, aggregates, DDL/DML…</span>
+          </div>
+          <div className="row">
+            <span className="col-name">scoring</span>
+            <span className="col-type">instant, per-question</span>
+          </div>
+        </div>
+
+        <button className="start-btn" id="start-btn" type="button" onClick={handleStart}>
+          ▸ RUN QUERY — Start Test
+        </button>
+        {resumeCount > 0 && resumeCount < QUESTIONS.length && (
+          <div className="resume-note">
+            Unfinished session found (<span id="resume-count">{resumeCount}</span> answered).{' '}
+            <button type="button" onClick={handleResume}>Resume</button> or{' '}
+            <button type="button" onClick={handleRestartFresh}>start over</button>.
+          </div>
+        )}
+      </section>
+
+      <section className={screen === 'quiz' ? 'screen active' : 'screen'} id="quiz">
+        <div className="progress-bar-track">
+          <div className="progress-bar-fill" id="progress-fill" style={{ width: `${progressPercent}%` }} />
+        </div>
+        <div className="status-row">
+          <span className="rowcount">
+            row <b id="q-index">{current + 1}</b> / {activeQueue.length}
+          </span>
+          <span className="section-tag" id="section-tag">
+            {sectionFor(activeQuestion?.num || 1)}
+          </span>
+          <span className={`timer-chip${remainingSeconds <= 60 ? ' urgent' : ''}`}>
+            time <b id="time-left">{timerMinutes}:{timerSeconds}</b>
+          </span>
+          <span className="score-chip">
+            score <b id="live-score">{correctCount}</b>/<span id="live-answered">{answeredCount}</span>
+          </span>
+        </div>
+
+        <div className="q-card">
+          <div className="q-eyebrow">
+            question <span id="q-num">{activeQuestion?.num || 1}</span>
+          </div>
+          <p className="q-text" id="q-text">{activeQuestion?.text}</p>
+          {activeQuestion?.code ? (
+            <div className="q-code" id="q-code-wrap">
+              <pre id="q-code" dangerouslySetInnerHTML={{ __html: highlightSQL(activeQuestion.code) }} />
+            </div>
+          ) : null}
+          <div className="options" id="options">
+            {activeQuestion?.options.map((opt, index) => {
+              const letter = LETTERS[index];
+              const selected = currentAnswer?.selected === letter;
+              const correct = activeQuestion.answer === letter;
+              const classes = ['option'];
+              if (selected) classes.push('selected');
+              if (currentAnswer) classes.push('locked');
+              if (correct) classes.push('correct');
+              if (selected && !correct) classes.push('incorrect');
+
+              return (
+                <button
+                  key={letter}
+                  type="button"
+                  className={classes.join(' ')}
+                  disabled={Boolean(currentAnswer)}
+                  onClick={() => handleSelect(letter)}
+                >
+                  <span className="letter">{letter}</span>
+                  <span>{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+          {currentAnswer ? (
+            <div className={`feedback-line show ${currentAnswer.correct ? 'good' : 'bad'}`} id="feedback">
+              {currentAnswer.correct
+                ? `✓ Correct — answer is ${activeQuestion.answer}.`
+                : `✗ Not quite — correct answer is ${activeQuestion.answer}.`}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="nav-row">
+          <button className="btn" id="prev-btn" type="button" onClick={handlePrev} disabled={current === 0}>
+            ← Back
+          </button>
+          <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer}>
+            {current < activeQueue.length - 1 ? 'Next →' : 'Finish →'}
+          </button>
+        </div>
+      </section>
+
+      <section className={screen === 'results' ? 'screen active' : 'screen'} id="results">
+        <div className="query-line">
+          <span className="kw">SELECT</span> * <span className="kw">FROM</span> session_results;
+        </div>
+        <h1 id="results-title">Query complete.</h1>
+        <div className="result-sub" id="results-sub">
+          {answeredCount} of {activeQueue.length} rows answered
+        </div>
+
+        <div className="score-panel">
+          <div className="score-ring">
+            <svg width="104" height="104">
+              <circle cx="52" cy="52" r="46" stroke="#232b38" strokeWidth="8" fill="none" />
+              <circle
+                id="ring-progress"
+                cx="52"
+                cy="52"
+                r="46"
+                stroke={gradeData.color}
+                strokeWidth="8"
+                fill="none"
+                strokeDasharray={2 * Math.PI * 46}
+                strokeDashoffset={2 * Math.PI * 46 * (1 - gradeData.pct / 100)}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="ring-label" id="ring-label">
+              {gradeData.pct}%
+            </div>
+          </div>
+          <div className="score-meta">
+            <div className="grade" id="grade-text">{gradeData.grade}</div>
+            <div className="grade-note" id="grade-note">{gradeData.note}</div>
+          </div>
+        </div>
+
+        <div className="section-breakdown">
+          <h3>Weak spots by section</h3>
+          <div id="sb-list">
+            {summaryBySection.map(([name, value]) => {
+              const pct = value.total ? value.correct / value.total : 0;
+              const fillClass = pct >= 0.75 ? '' : pct >= 0.5 ? 'mid' : 'weak';
+              return (
+                <div className="sb-row" key={name}>
+                  <span className="sb-label">{name}</span>
+                  <span className="sb-track">
+                    <span className={`sb-fill ${fillClass}`} style={{ width: `${pct * 100}%` }} />
+                  </span>
+                  <span className="sb-count">{value.correct}/{value.total}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <button className="review-toggle" id="review-toggle-btn" type="button" onClick={() => setShowReview(!showReview)}>
+          {showReview ? 'Hide full answer review ▴' : 'Show full answer review ▾'}
+        </button>
+        <div id="review-wrap" className={showReview ? 'show' : ''}>
+          <div className="review-list" id="review-list">
+            {activeQueue.map((q) => {
+              const answer = answers[q.num];
+              const wasCorrect = answer?.correct;
+              const yourText = answer ? q.options[LETTERS.indexOf(answer.selected)] : 'Skipped';
+              const correctText = q.options[LETTERS.indexOf(q.answer)];
+              return (
+                <div className={`review-item ${wasCorrect ? 'right' : 'wrong'}`} key={q.num}>
+                  <div className="ri-head">
+                    <span>Q{q.num} · {sectionFor(q.num)}</span>
+                    <span>{wasCorrect ? '✓ correct' : '✗ review'}</span>
+                  </div>
+                  <div className="ri-q">{q.text}</div>
+                  <div className="ri-ans">
+                    {!wasCorrect && (
+                      <span className="yours">Your answer: {answer?.selected || '—'}) {yourText}</span>
+                    )}
+                    <br />
+                    <span className="correct">Correct: {q.answer}) {correctText}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="results-actions">
+          <button className="btn primary" id="retry-btn" type="button" onClick={handleRetry}>
+            ↻ Retake test
+          </button>
+          <button className="btn" id="retry-wrong-btn" type="button" onClick={handleRetryWrong}>
+            Retry missed questions only
+          </button>
+        </div>
+      </section>
+
+      <footer className="foot">query_bench · local session, no data leaves your browser</footer>
+    </div>
+  );
+}
