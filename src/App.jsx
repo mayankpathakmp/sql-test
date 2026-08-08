@@ -121,6 +121,7 @@ export default function App() {
   const timerMinutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
   const isQuizComplete = answeredCount === activeQueue.length;
   const timerSeconds = String(remainingSeconds % 60).padStart(2, '0');
+  const showFinishHint = current === activeQueue.length - 1 && Boolean(currentAnswer);
 
   const gradeData = useMemo(() => {
     const pct = displayPct;
@@ -428,6 +429,9 @@ export default function App() {
             <span className="btn-icon">{current < activeQueue.length - 1 ? '⟶' : '✔'}</span>
           </button>
         </div>
+        {showFinishHint ? (
+          <div className="finish-hint">Finish quiz to unlock the final report and weak-area summary.</div>
+        ) : null}
       </section>
 
       <section className={screen === 'results' ? 'screen active' : 'screen'} id="results">
