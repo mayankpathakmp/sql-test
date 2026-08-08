@@ -459,7 +459,9 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(parsed && parsed.answers){
+      if(parsed && typeof parsed === 'object'){
+        if(typeof parsed.current !== 'number') parsed.current = 0;
+        if(typeof parsed.answers !== 'object' || parsed.answers === null) parsed.answers = {};
         if(typeof parsed.remainingSeconds !== 'number') parsed.remainingSeconds = TOTAL_SECONDS;
         return parsed;
       }
@@ -486,6 +488,13 @@ function showScreen(id){
 // ---------- Intro ----------
 const existing = loadState();
 if(existing && Object.keys(existing.answers).length > 0 && Object.keys(existing.answers).length < 100){
+  state = existing;
+  showScreen('quiz');
+  updateTimerDisplay();
+  startTimer();
+  renderQuestion();
+} else if(existing && Object.keys(existing.answers).length > 0){
+  // Keep saved state available for review if needed.
   document.getElementById('resume-note').style.display = 'block';
   document.getElementById('resume-count').textContent = Object.keys(existing.answers).length;
 }
