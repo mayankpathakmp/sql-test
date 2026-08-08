@@ -481,7 +481,7 @@ export default function App() {
           </button>
           <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer} aria-label={current < activeQueue.length - 1 ? 'Next question' : 'View final report'}>
             <span className="btn-icon">{current < activeQueue.length - 1 ? '⟶' : '✔'}</span>
-            {current === activeQueue.length - 1 ? <span className="btn-text">View final report</span> : null}
+            <span className="btn-text">{current < activeQueue.length - 1 ? 'Next' : 'View final report'}</span>
           </button>
         </div>
         {showFinishHint ? (
