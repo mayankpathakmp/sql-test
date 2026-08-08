@@ -91,6 +91,7 @@ export default function App() {
   const [penalties, setPenalties] = useState(0);
   const [showReview, setShowReview] = useState(false);
   const timerRef = useRef(null);
+  const autoAdvanceRef = useRef(null);
 
   useEffect(() => {
     const saved = loadState();
@@ -140,6 +141,10 @@ export default function App() {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
+      }
+      if (autoAdvanceRef.current) {
+        clearTimeout(autoAdvanceRef.current);
+        autoAdvanceRef.current = null;
       }
     };
   }, [screen]);
@@ -251,6 +256,15 @@ export default function App() {
       [activeQuestion.num]: { selected: letter, correct },
     };
     setAnswers(nextAnswers);
+    // Auto-advance shortly after selection to avoid accidental missed clicks
+    if (autoAdvanceRef.current) clearTimeout(autoAdvanceRef.current);
+    autoAdvanceRef.current = setTimeout(() => {
+      if (current < activeQueue.length - 1) {
+        setCurrent((prev) => prev + 1);
+      } else {
+        finishQuiz();
+      }
+    }, 450);
   };
 
   const handleSkip = () => {
