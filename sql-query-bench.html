@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SQL — 100 Query Bench</title>
+<title>SQL — 50 Query Bench</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -327,19 +327,19 @@
   <div class="topbar">
     <div class="brand">
       <div class="dot-row"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span></div>
-      <div class="brand-name"><b>query_bench</b> — sql_100.session</div>
+      <div class="brand-name"><b>query_bench</b> — sql_50.session</div>
     </div>
     <div class="conn-status"><span class="pulse"></span>connected</div>
   </div>
 
   <!-- ============ INTRO SCREEN ============ -->
   <section class="screen active" id="intro">
-    <div class="query-line"><span class="kw">SELECT</span> * <span class="kw">FROM</span> sql_fundamentals <span class="kw">LIMIT</span> 100;</div>
+    <div class="query-line"><span class="kw">SELECT</span> * <span class="kw">FROM</span> sql_fundamentals <span class="kw">LIMIT</span> 50;</div>
     <h1>Test your <span class="accentword">SQL</span> fundamentals.</h1>
-    <p class="lead">100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end. You have 30 minutes to complete the full quiz.</p>
+    <p class="lead">50 questions pulled from the full 100-question topic pool: data types, keys, constraints, joins, aggregates, subqueries and more. One question at a time, instant feedback, full review at the end. You have 45 minutes to complete the full quiz.</p>
 
     <div class="schema-panel">
-      <div class="row"><span class="col-name">questions</span><span class="col-type">100 rows</span></div>
+      <div class="row"><span class="col-name">questions</span><span class="col-type">50 rows</span></div>
       <div class="row"><span class="col-name">format</span><span class="col-type">single-select · 4 options</span></div>
       <div class="row"><span class="col-name">topics</span><span class="col-type">21 sections · keys, joins, aggregates, DDL/DML…</span></div>
       <div class="row"><span class="col-name">scoring</span><span class="col-type">instant, per-question</span></div>
@@ -355,9 +355,9 @@
   <section class="screen" id="quiz">
     <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="status-row">
-      <span class="rowcount">row <b id="q-index">1</b> / 100</span>
+      <span class="rowcount">row <b id="q-index">1</b> / <span id="q-total">50</span></span>
       <span class="section-tag" id="section-tag">Data Types</span>
-      <span class="timer-chip">time <b id="time-left">30:00</b></span>
+      <span class="timer-chip">time <b id="time-left">45:00</b></span>
       <span class="score-chip">score <b id="live-score">0</b>/<span id="live-answered">0</span></span>
     </div>
 
@@ -379,7 +379,7 @@
   <section class="screen" id="results">
     <div class="query-line"><span class="kw">SELECT</span> * <span class="kw">FROM</span> session_results;</div>
     <h1 id="results-title">Query complete.</h1>
-    <div class="result-sub" id="results-sub">100 rows returned</div>
+    <div class="result-sub" id="results-sub">50 rows returned</div>
 
     <div class="score-panel">
       <div class="score-ring">
@@ -445,9 +445,25 @@ function sectionFor(num){
 
 const LETTERS = ["A","B","C","D"];
 const STORAGE_KEY = "sql_query_bench_v1";
-const TOTAL_SECONDS = 30 * 60;
+const STORAGE_VERSION = 2;
+const SESSION_SIZE = 50;
+const TOTAL_SECONDS = 45 * 60;
 let timerInterval = null;
 
+function shuffleArray(array){
+  const copy = [...array];
+  for(let i = copy.length - 1; i > 0; i -= 1){
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function buildQuizQueue(){
+  return shuffleArray(QUESTIONS).slice(0, SESSION_SIZE);
+}
+
+let activeQueue = buildQuizQueue();
 let state = {
   current: 0,
   answers: {}, // qnum -> {selected:'B', correct:bool}
@@ -459,10 +475,16 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(parsed && typeof parsed === 'object'){
+      if(parsed && typeof parsed === 'object' && parsed.version === STORAGE_VERSION){
         if(typeof parsed.current !== 'number') parsed.current = 0;
         if(typeof parsed.answers !== 'object' || parsed.answers === null) parsed.answers = {};
         if(typeof parsed.remainingSeconds !== 'number') parsed.remainingSeconds = TOTAL_SECONDS;
+        if(Array.isArray(parsed.activeQueue) && parsed.activeQueue.length === SESSION_SIZE){
+          activeQueue = parsed.activeQueue;
+        } else {
+          return null;
+        }
+        if(Object.keys(parsed.answers).length > SESSION_SIZE) return null;
         return parsed;
       }
     }
@@ -470,7 +492,7 @@ function loadState(){
   return null;
 }
 function saveState(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, activeQueue, version: STORAGE_VERSION })); }catch(e){}
 }
 function clearState(){
   try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
@@ -487,7 +509,7 @@ function showScreen(id){
 
 // ---------- Intro ----------
 const existing = loadState();
-if(existing && Object.keys(existing.answers).length > 0 && Object.keys(existing.answers).length < 100){
+if(existing && Object.keys(existing.answers).length > 0 && Object.keys(existing.answers).length < 50){
   state = existing;
   showScreen('quiz');
   updateTimerDisplay();
@@ -532,6 +554,7 @@ const optionsEl = document.getElementById('options');
 const feedbackEl = document.getElementById('feedback');
 const qNumEl = document.getElementById('q-num');
 const qIndexEl = document.getElementById('q-index');
+const qTotalEl = document.getElementById('q-total');
 const sectionTagEl = document.getElementById('section-tag');
 const progressFill = document.getElementById('progress-fill');
 const liveScoreEl = document.getElementById('live-score');
@@ -540,7 +563,7 @@ const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 const timeLeftEl = document.getElementById('time-left');
 
-let activeQueue = QUESTIONS; // can be swapped for "retry missed"
+let activeQueue = buildQuizQueue(); // can be swapped for "retry missed"
 
 function startTimer(){
   if(timerInterval) clearInterval(timerInterval);
@@ -589,6 +612,7 @@ function renderQuestion(){
   const q = activeQueue[idx];
   qNumEl.textContent = q.num;
   qIndexEl.textContent = idx + 1;
+  qTotalEl.textContent = activeQueue.length;
   sectionTagEl.textContent = sectionFor(q.num);
   qTextEl.textContent = q.text;
 
@@ -763,12 +787,13 @@ document.getElementById('review-toggle-btn').addEventListener('click', (e) => {
 });
 
 document.getElementById('retry-btn').addEventListener('click', () => {
-  activeQueue = QUESTIONS;
-  state = {current:0, answers:{}};
+  activeQueue = buildQuizQueue();
+  state = {current:0, answers:{}, remainingSeconds: TOTAL_SECONDS};
   saveState();
   document.getElementById('review-wrap').classList.remove('show');
   document.getElementById('review-toggle-btn').textContent = 'Show full answer review ▾';
   showScreen('quiz');
+  resetTimer();
   renderQuestion();
 });
 

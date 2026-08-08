@@ -3,6 +3,7 @@ import { QUESTIONS, SECTIONS } from './data';
 import './App.css';
 
 const STORAGE_KEY = 'sql_query_bench_v1';
+const STORAGE_VERSION = 2;
 const TOTAL_SECONDS = 45 * 60;
 const SESSION_SIZE = 50;
 const LETTERS = ['A', 'B', 'C', 'D'];
@@ -53,6 +54,7 @@ function loadState() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
+    if (parsed.version !== STORAGE_VERSION) return null;
     return {
       current: typeof parsed.current === 'number' ? parsed.current : 0,
       answers: typeof parsed.answers === 'object' && parsed.answers ? parsed.answers : {},
@@ -68,7 +70,7 @@ function loadState() {
 
 function saveState(state) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, version: STORAGE_VERSION }));
   } catch (e) {
     // ignore storage failures
   }
@@ -286,7 +288,8 @@ export default function App() {
   };
 
   const handleRetry = () => {
-    setActiveQueue(QUESTIONS);
+    const queue = buildShuffledQueue(QUESTIONS);
+    setActiveQueue(queue);
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
@@ -328,7 +331,7 @@ export default function App() {
             <span className="dot g" />
           </div>
           <div className="brand-name">
-            <b>query_bench</b> — sql_100.session
+            <b>query_bench</b> — sql_50.session
           </div>
         </div>
         <div className="conn-status">
@@ -338,7 +341,7 @@ export default function App() {
 
       <section className={screen === 'intro' ? 'screen active' : 'screen'} id="intro">
         <div className="query-line">
-          <span className="kw">SELECT</span> * <span className="kw">FROM</span> sql_fundamentals <span className="kw">LIMIT</span> 100;
+          <span className="kw">SELECT</span> * <span className="kw">FROM</span> sql_fundamentals <span className="kw">LIMIT</span> 50;
         </div>
         <h1>
           Test your <span className="accentword">SQL</span> fundamentals.
