@@ -199,6 +199,20 @@ export default function App() {
     setAnswers(nextAnswers);
   };
 
+  const handleSkip = () => {
+    if (answers[activeQuestion.num]) return;
+    const nextAnswers = {
+      ...answers,
+      [activeQuestion.num]: { selected: null, correct: false, skipped: true },
+    };
+    setAnswers(nextAnswers);
+    if (current < activeQueue.length - 1) {
+      setCurrent((prev) => prev + 1);
+    } else {
+      finishQuiz();
+    }
+  };
+
   const finishQuiz = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -368,6 +382,8 @@ export default function App() {
             <div className={`feedback-line show ${currentAnswer.correct ? 'good' : 'bad'}`} id="feedback">
               {currentAnswer.correct
                 ? `✓ Correct — answer is ${activeQuestion.answer}.`
+                : currentAnswer.skipped
+                ? `⚠️ Skipped — marked as 0 and moved on.`
                 : `✗ Not quite — correct answer is ${activeQuestion.answer}.`}
             </div>
           ) : null}
@@ -376,6 +392,9 @@ export default function App() {
         <div className="nav-row">
           <button className="btn" id="prev-btn" type="button" onClick={handlePrev} disabled={current === 0}>
             ← Back
+          </button>
+          <button className="btn" id="skip-btn" type="button" onClick={handleSkip} disabled={Boolean(currentAnswer)}>
+            Skip / 0
           </button>
           <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer}>
             {current < activeQueue.length - 1 ? 'Next →' : 'Finish →'}
