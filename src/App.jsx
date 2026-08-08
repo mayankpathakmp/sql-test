@@ -4,6 +4,7 @@ import './App.css';
 
 const STORAGE_KEY = 'sql_query_bench_v1';
 const TOTAL_SECONDS = 45 * 60;
+const SESSION_SIZE = 50;
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 function sectionFor(num) {
@@ -41,9 +42,9 @@ function shuffleQuestionOptions(question) {
 }
 
 function buildShuffledQueue(questions) {
-  return shuffleArray(
-    questions.map((q) => shuffleQuestionOptions(q))
-  );
+  return shuffleArray(questions)
+    .slice(0, SESSION_SIZE)
+    .map((q) => shuffleQuestionOptions(q));
 }
 
 function loadState() {
@@ -93,7 +94,8 @@ export default function App() {
       setPenalties(saved.penalties);
       setResumeCount(Object.keys(saved.answers).length);
       setActiveQueue(saved.activeQueue || QUESTIONS);
-      if (Object.keys(saved.answers).length < QUESTIONS.length) {
+      const totalCount = saved.activeQueue?.length || QUESTIONS.length;
+      if (Object.keys(saved.answers).length < totalCount) {
         setScreen('quiz');
       } else {
         setScreen('results');
@@ -342,13 +344,13 @@ export default function App() {
           Test your <span className="accentword">SQL</span> fundamentals.
         </h1>
         <p className="lead">
-          100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end. You have 45 minutes to complete the full quiz.
+          50 questions pulled from the full 100-question topic pool: data types, keys, constraints, joins, aggregates, subqueries and more. One question at a time, instant feedback, full review at the end. You have 45 minutes to complete the full quiz.
         </p>
 
         <div className="schema-panel">
           <div className="row">
             <span className="col-name">questions</span>
-            <span className="col-type">100 rows</span>
+            <span className="col-type">50 rows</span>
           </div>
           <div className="row">
             <span className="col-name">format</span>
@@ -367,7 +369,7 @@ export default function App() {
         <button className="start-btn" id="start-btn" type="button" onClick={handleStart}>
           ▸ RUN QUERY — Start Test
         </button>
-        {resumeCount > 0 && resumeCount < QUESTIONS.length && (
+        {resumeCount > 0 && resumeCount < activeQueue.length && (
           <div className="resume-note">
             Unfinished session found (<span id="resume-count">{resumeCount}</span> answered).{' '}
             <button type="button" onClick={handleResume}>Resume</button> or{' '}
