@@ -3,7 +3,7 @@ import { QUESTIONS, SECTIONS } from './data';
 import './App.css';
 
 const STORAGE_KEY = 'sql_query_bench_v1';
-const TOTAL_SECONDS = 30 * 60;
+const TOTAL_SECONDS = 45 * 60;
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 function sectionFor(num) {
@@ -390,15 +390,17 @@ export default function App() {
         </div>
 
         <div className="nav-row">
-          <button className="btn" id="prev-btn" type="button" onClick={handlePrev} disabled={current === 0}>
-            ← Back
+          <button className="btn" id="prev-btn" type="button" onClick={handlePrev} disabled={current === 0} aria-label="Previous question">
+            <span className="btn-icon">⟵</span>
+            <span className="visually-hidden">Previous</span>
           </button>
           <button className="btn skip-btn" id="skip-btn" type="button" onClick={handleSkip} disabled={Boolean(currentAnswer)} aria-label="Skip question and mark as zero">
-            <span className="skip-label">Skip / 0</span>
-            <span className="skip-symbol" aria-hidden="true">⏭</span>
+            <span className="btn-icon">⏭</span>
+            <span className="visually-hidden">Skip</span>
           </button>
-          <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer}>
-            {current < activeQueue.length - 1 ? 'Next →' : 'Finish →'}
+          <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer} aria-label={current < activeQueue.length - 1 ? 'Next question' : 'Finish quiz'}>
+            <span className="btn-icon">{current < activeQueue.length - 1 ? '⟶' : '✔'}</span>
+            <span className="visually-hidden">{current < activeQueue.length - 1 ? 'Next' : 'Finish'}</span>
           </button>
         </div>
       </section>
