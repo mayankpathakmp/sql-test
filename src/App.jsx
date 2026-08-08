@@ -55,13 +55,18 @@ function loadState() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
     if (parsed.version !== STORAGE_VERSION) return null;
+    if (!Array.isArray(parsed.activeQueue) || parsed.activeQueue.length !== SESSION_SIZE) return null;
+    const current = typeof parsed.current === 'number' ? parsed.current : 0;
+    if (current < 0 || current >= parsed.activeQueue.length) return null;
+    const answers = typeof parsed.answers === 'object' && parsed.answers ? parsed.answers : {};
+    if (Object.keys(answers).length > parsed.activeQueue.length) return null;
     return {
-      current: typeof parsed.current === 'number' ? parsed.current : 0,
-      answers: typeof parsed.answers === 'object' && parsed.answers ? parsed.answers : {},
+      current,
+      answers,
       remainingSeconds:
         typeof parsed.remainingSeconds === 'number' ? parsed.remainingSeconds : TOTAL_SECONDS,
       penalties: typeof parsed.penalties === 'number' ? parsed.penalties : 0,
-      activeQueue: Array.isArray(parsed.activeQueue) ? parsed.activeQueue : null,
+      activeQueue: parsed.activeQueue,
     };
   } catch (e) {
     return null;
@@ -387,7 +392,7 @@ export default function App() {
         </div>
         <div className="status-row">
           <span className="rowcount">
-            row <b id="q-index">{current + 1}</b> / {activeQueue.length}
+            session <b id="q-index">{current + 1}</b> / {activeQueue.length}
           </span>
           <span className="section-tag" id="section-tag">
             {sectionFor(activeQuestion?.num || 1)}

@@ -355,7 +355,7 @@
   <section class="screen" id="quiz">
     <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="status-row">
-      <span class="rowcount">row <b id="q-index">1</b> / <span id="q-total">50</span></span>
+      <span class="rowcount">session <b id="q-index">1</b> / <span id="q-total">50</span></span>
       <span class="section-tag" id="section-tag">Data Types</span>
       <span class="timer-chip">time <b id="time-left">45:00</b></span>
       <span class="score-chip">score <b id="live-score">0</b>/<span id="live-answered">0</span></span>
@@ -476,15 +476,13 @@ function loadState(){
     if(raw){
       const parsed = JSON.parse(raw);
       if(parsed && typeof parsed === 'object' && parsed.version === STORAGE_VERSION){
+        if(!Array.isArray(parsed.activeQueue) || parsed.activeQueue.length !== SESSION_SIZE) return null;
         if(typeof parsed.current !== 'number') parsed.current = 0;
+        if(parsed.current < 0 || parsed.current >= parsed.activeQueue.length) return null;
         if(typeof parsed.answers !== 'object' || parsed.answers === null) parsed.answers = {};
         if(typeof parsed.remainingSeconds !== 'number') parsed.remainingSeconds = TOTAL_SECONDS;
-        if(Array.isArray(parsed.activeQueue) && parsed.activeQueue.length === SESSION_SIZE){
-          activeQueue = parsed.activeQueue;
-        } else {
-          return null;
-        }
-        if(Object.keys(parsed.answers).length > SESSION_SIZE) return null;
+        if(Object.keys(parsed.answers).length > parsed.activeQueue.length) return null;
+        activeQueue = parsed.activeQueue;
         return parsed;
       }
     }
@@ -609,6 +607,10 @@ function highlightSQL(code){
 
 function renderQuestion(){
   const idx = state.current;
+  if(idx < 0 || idx >= activeQueue.length){
+    finishQuiz();
+    return;
+  }
   const q = activeQueue[idx];
   qNumEl.textContent = q.num;
   qIndexEl.textContent = idx + 1;
