@@ -347,7 +347,7 @@ export default function App() {
               const classes = ['option'];
               if (selected) classes.push('selected');
               if (currentAnswer) classes.push('locked');
-              if (correct) classes.push('correct');
+              if (selected && correct) classes.push('correct');
               if (selected && !correct) classes.push('incorrect');
 
               return (
