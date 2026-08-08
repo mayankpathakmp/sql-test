@@ -241,7 +241,6 @@ export default function App() {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    localStorage.removeItem(STORAGE_KEY);
     setScreen('results');
   };
 
