@@ -411,9 +411,12 @@ export default function App() {
 
         <div className="q-card">
           <div className="q-eyebrow">
-            question <span id="q-num">{activeQuestion?.num || 1}</span>
+            session question <span id="q-num">{current + 1}</span> / {activeQueue.length}
           </div>
           <p className="q-text" id="q-text">{activeQuestion?.text}</p>
+          <div className="source-note">
+            original question #{activeQuestion?.num}
+          </div>
           {activeQuestion?.code ? (
             <div className="q-code" id="q-code-wrap">
               <pre id="q-code" dangerouslySetInnerHTML={{ __html: highlightSQL(activeQuestion.code) }} />
