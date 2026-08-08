@@ -160,6 +160,7 @@ export default function App() {
   const timerMinutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
   const isQuizComplete = answeredCount === activeQueue.length;
   const timerSeconds = String(remainingSeconds % 60).padStart(2, '0');
+  const currentAnswer = answers[activeQuestion?.num];
   const showFinishHint = current === activeQueue.length - 1 && Boolean(currentAnswer);
 
   const gradeData = useMemo(() => {
@@ -337,8 +338,6 @@ export default function App() {
     setScreen('quiz');
     setShowReview(false);
   };
-
-  const currentAnswer = answers[activeQuestion?.num];
 
   return (
     <div className="app">
