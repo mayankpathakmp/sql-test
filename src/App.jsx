@@ -3,7 +3,7 @@ import { QUESTIONS, SECTIONS } from './data';
 import './App.css';
 
 const STORAGE_KEY = 'sql_query_bench_v1';
-const TOTAL_SECONDS = 60 * 60;
+const TOTAL_SECONDS = 45 * 60;
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 function sectionFor(num) {
@@ -23,6 +23,29 @@ function highlightSQL(code) {
   return escaped.replace(re, '<span class="kw">$1</span>');
 }
 
+function shuffleArray(array) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function shuffleQuestionOptions(question) {
+  const sourceOptions = [...question.options];
+  const correctText = sourceOptions[LETTERS.indexOf(question.answer)];
+  const options = shuffleArray(sourceOptions);
+  const answer = String.fromCharCode(65 + options.indexOf(correctText));
+  return { ...question, options, answer };
+}
+
+function buildShuffledQueue(questions) {
+  return shuffleArray(
+    questions.map((q) => shuffleQuestionOptions(q))
+  );
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -35,6 +58,7 @@ function loadState() {
       remainingSeconds:
         typeof parsed.remainingSeconds === 'number' ? parsed.remainingSeconds : TOTAL_SECONDS,
       penalties: typeof parsed.penalties === 'number' ? parsed.penalties : 0,
+      activeQueue: Array.isArray(parsed.activeQueue) ? parsed.activeQueue : null,
     };
   } catch (e) {
     return null;
@@ -68,6 +92,7 @@ export default function App() {
       setRemainingSeconds(saved.remainingSeconds);
       setPenalties(saved.penalties);
       setResumeCount(Object.keys(saved.answers).length);
+      setActiveQueue(saved.activeQueue || QUESTIONS);
       if (Object.keys(saved.answers).length < QUESTIONS.length) {
         setScreen('quiz');
       } else {
@@ -77,8 +102,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    saveState({ current, answers, remainingSeconds, penalties });
-  }, [current, answers, remainingSeconds, penalties]);
+    saveState({ current, answers, remainingSeconds, penalties, activeQueue });
+  }, [current, answers, remainingSeconds, penalties, activeQueue]);
 
   useEffect(() => {
     if (screen !== 'quiz') {
@@ -181,7 +206,8 @@ export default function App() {
   }, [summaryBySection]);
 
   const handleStart = () => {
-    setActiveQueue(QUESTIONS);
+    const queue = buildShuffledQueue(QUESTIONS);
+    setActiveQueue(queue);
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
@@ -198,7 +224,8 @@ export default function App() {
 
   const handleRestartFresh = () => {
     localStorage.removeItem(STORAGE_KEY);
-    setActiveQueue(QUESTIONS);
+    const queue = buildShuffledQueue(QUESTIONS);
+    setActiveQueue(queue);
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
@@ -276,7 +303,8 @@ export default function App() {
       alert('No missed questions — nice work!');
       return;
     }
-    setActiveQueue(missed);
+    const queue = buildShuffledQueue(missed);
+    setActiveQueue(queue);
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
@@ -314,7 +342,7 @@ export default function App() {
           Test your <span className="accentword">SQL</span> fundamentals.
         </h1>
         <p className="lead">
-          100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end. You have 30 minutes to complete the full quiz.
+          100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end. You have 45 minutes to complete the full quiz.
         </p>
 
         <div className="schema-panel">
