@@ -237,6 +237,12 @@
   }
   .score-chip b{ color:var(--text-bright); }
 
+  .timer-chip{
+    font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+  }
+  .timer-chip b{ color:var(--text-bright); }
+  .timer-chip.urgent b{ color:var(--bad); }
+
   /* ---------- Results screen ---------- */
   #results h1{
     font-family:var(--sans); font-weight:800; font-size:1.9rem; color:var(--text-bright);
@@ -330,7 +336,7 @@
   <section class="screen active" id="intro">
     <div class="query-line"><span class="kw">SELECT</span> * <span class="kw">FROM</span> sql_fundamentals <span class="kw">LIMIT</span> 100;</div>
     <h1>Test your <span class="accentword">SQL</span> fundamentals.</h1>
-    <p class="lead">100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end.</p>
+    <p class="lead">100 questions across data types, keys, constraints, joins, aggregates, subqueries and more — pulled straight from your practice set. One question at a time, instant feedback, full review at the end. You have 30 minutes to complete the full quiz.</p>
 
     <div class="schema-panel">
       <div class="row"><span class="col-name">questions</span><span class="col-type">100 rows</span></div>
@@ -351,6 +357,7 @@
     <div class="status-row">
       <span class="rowcount">row <b id="q-index">1</b> / 100</span>
       <span class="section-tag" id="section-tag">Data Types</span>
+      <span class="timer-chip">time <b id="time-left">30:00</b></span>
       <span class="score-chip">score <b id="live-score">0</b>/<span id="live-answered">0</span></span>
     </div>
 
@@ -438,10 +445,13 @@ function sectionFor(num){
 
 const LETTERS = ["A","B","C","D"];
 const STORAGE_KEY = "sql_query_bench_v1";
+const TOTAL_SECONDS = 30 * 60;
+let timerInterval = null;
 
 let state = {
   current: 0,
   answers: {}, // qnum -> {selected:'B', correct:bool}
+  remainingSeconds: TOTAL_SECONDS,
 };
 
 function loadState(){
@@ -449,7 +459,10 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
-      if(parsed && parsed.answers) return parsed;
+      if(parsed && parsed.answers){
+        if(typeof parsed.remainingSeconds !== 'number') parsed.remainingSeconds = TOTAL_SECONDS;
+        return parsed;
+      }
     }
   }catch(e){}
   return null;
@@ -478,21 +491,27 @@ if(existing && Object.keys(existing.answers).length > 0 && Object.keys(existing.
 }
 
 document.getElementById('start-btn').addEventListener('click', () => {
-  state = {current:0, answers:{}};
+  state = {current:0, answers:{}, remainingSeconds: TOTAL_SECONDS};
   saveState();
   showScreen('quiz');
+  updateTimerDisplay();
+  startTimer();
   renderQuestion();
 });
 document.getElementById('resume-btn').addEventListener('click', () => {
   state = existing;
   showScreen('quiz');
+  updateTimerDisplay();
+  startTimer();
   renderQuestion();
 });
 document.getElementById('restart-fresh-btn').addEventListener('click', () => {
   clearState();
-  state = {current:0, answers:{}};
+  state = {current:0, answers:{}, remainingSeconds: TOTAL_SECONDS};
   saveState();
   showScreen('quiz');
+  updateTimerDisplay();
+  startTimer();
   renderQuestion();
 });
 
@@ -510,8 +529,40 @@ const liveScoreEl = document.getElementById('live-score');
 const liveAnsweredEl = document.getElementById('live-answered');
 const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
+const timeLeftEl = document.getElementById('time-left');
 
 let activeQueue = QUESTIONS; // can be swapped for "retry missed"
+
+function startTimer(){
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if(state.remainingSeconds <= 0){
+      clearInterval(timerInterval);
+      finishQuiz();
+      return;
+    }
+    state.remainingSeconds -= 1;
+    saveState();
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function stopTimer(){
+  if(timerInterval) clearInterval(timerInterval);
+}
+
+function resetTimer(){
+  state.remainingSeconds = TOTAL_SECONDS;
+  saveState();
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay(){
+  const mins = Math.floor(state.remainingSeconds / 60);
+  const secs = state.remainingSeconds % 60;
+  timeLeftEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+  timeLeftEl.parentElement.classList.toggle('urgent', state.remainingSeconds <= 60);
+}
 
 function highlightSQL(code){
   const kws = ['SELECT','FROM','WHERE','INSERT','INTO','VALUES','UPDATE','SET','DELETE','CREATE','TABLE','DATABASE',
@@ -564,6 +615,7 @@ function renderQuestion(){
   nextBtn.textContent = idx === activeQueue.length - 1 ? 'Finish →' : 'Next →';
 
   updateStatusBar();
+  updateTimerDisplay();
 }
 
 function selectAnswer(q, letter, btnEl){
@@ -623,6 +675,7 @@ nextBtn.addEventListener('click', () => {
 
 // ---------- Results ----------
 function finishQuiz(){
+  stopTimer();
   clearState();
   const total = activeQueue.length;
   const answered = Object.keys(state.answers).length;
