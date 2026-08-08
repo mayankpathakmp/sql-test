@@ -457,8 +457,9 @@ export default function App() {
           <button className="btn skip-btn" id="skip-btn" type="button" onClick={handleSkip} disabled={Boolean(currentAnswer)} aria-label="Skip question and mark as zero">
             <span className="btn-icon">⏭</span>
           </button>
-          <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer} aria-label={current < activeQueue.length - 1 ? 'Next question' : 'Finish quiz'}>
+          <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer} aria-label={current < activeQueue.length - 1 ? 'Next question' : 'View final report'}>
             <span className="btn-icon">{current < activeQueue.length - 1 ? '⟶' : '✔'}</span>
+            {current === activeQueue.length - 1 ? <span className="btn-text">View final report</span> : null}
           </button>
         </div>
         {showFinishHint ? (
