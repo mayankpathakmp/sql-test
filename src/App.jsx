@@ -34,6 +34,7 @@ function loadState() {
       answers: typeof parsed.answers === 'object' && parsed.answers ? parsed.answers : {},
       remainingSeconds:
         typeof parsed.remainingSeconds === 'number' ? parsed.remainingSeconds : TOTAL_SECONDS,
+      penalties: typeof parsed.penalties === 'number' ? parsed.penalties : 0,
     };
   } catch (e) {
     return null;
@@ -55,6 +56,7 @@ export default function App() {
   const [remainingSeconds, setRemainingSeconds] = useState(TOTAL_SECONDS);
   const [activeQueue, setActiveQueue] = useState(QUESTIONS);
   const [resumeCount, setResumeCount] = useState(0);
+  const [penalties, setPenalties] = useState(0);
   const [showReview, setShowReview] = useState(false);
   const timerRef = useRef(null);
 
@@ -64,6 +66,7 @@ export default function App() {
       setCurrent(saved.current);
       setAnswers(saved.answers);
       setRemainingSeconds(saved.remainingSeconds);
+      setPenalties(saved.penalties);
       setResumeCount(Object.keys(saved.answers).length);
       if (Object.keys(saved.answers).length < QUESTIONS.length) {
         setScreen('quiz');
@@ -74,8 +77,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    saveState({ current, answers, remainingSeconds });
-  }, [current, answers, remainingSeconds]);
+    saveState({ current, answers, remainingSeconds, penalties });
+  }, [current, answers, remainingSeconds, penalties]);
 
   useEffect(() => {
     if (screen !== 'quiz') {
@@ -110,12 +113,13 @@ export default function App() {
   const activeQuestion = activeQueue[current];
   const answeredCount = Object.keys(answers).length;
   const correctCount = Object.values(answers).filter((item) => item.correct).length;
+  const effectiveScore = Math.max(correctCount - penalties, 0);
   const progressPercent = activeQueue.length ? (current / activeQueue.length) * 100 : 0;
   const timerMinutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
   const timerSeconds = String(remainingSeconds % 60).padStart(2, '0');
 
   const gradeData = useMemo(() => {
-    const pct = Math.round((correctCount / activeQueue.length) * 100);
+    const pct = Math.round((effectiveScore / activeQueue.length) * 100);
     if (pct >= 90) {
       return {
         grade: 'Excellent — mastery level',
@@ -169,6 +173,7 @@ export default function App() {
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
+    setPenalties(0);
     localStorage.removeItem(STORAGE_KEY);
     setScreen('quiz');
     setShowReview(false);
@@ -185,6 +190,7 @@ export default function App() {
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
+    setPenalties(0);
     setScreen('quiz');
     setShowReview(false);
   };
@@ -213,6 +219,11 @@ export default function App() {
     }
   };
 
+  const handleAddTime = () => {
+    setRemainingSeconds((prev) => prev + 15 * 60);
+    setPenalties((prev) => prev + 1);
+  };
+
   const finishQuiz = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -239,6 +250,7 @@ export default function App() {
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
+    setPenalties(0);
     localStorage.removeItem(STORAGE_KEY);
     setScreen('quiz');
     setShowReview(false);
@@ -257,6 +269,7 @@ export default function App() {
     setCurrent(0);
     setAnswers({});
     setRemainingSeconds(TOTAL_SECONDS);
+    setPenalties(0);
     localStorage.removeItem(STORAGE_KEY);
     setScreen('quiz');
     setShowReview(false);
@@ -338,8 +351,12 @@ export default function App() {
           <span className={`timer-chip${remainingSeconds <= 60 ? ' urgent' : ''}`}>
             time <b id="time-left">{timerMinutes}:{timerSeconds}</b>
           </span>
+          <button className="btn time-boost-btn" type="button" onClick={handleAddTime} title="Add 15 minutes (−1 penalty)" aria-label="Add 15 minutes with one point penalty">
+            <span className="btn-icon">⏱</span>
+          </button>
           <span className="score-chip">
-            score <b id="live-score">{correctCount}</b>/<span id="live-answered">{answeredCount}</span>
+            score <b id="live-score">{effectiveScore}</b>/<span id="live-answered">{answeredCount}</span>
+            {penalties > 0 ? <span className="penalty-chip"> −{penalties}</span> : null}
           </span>
         </div>
 
