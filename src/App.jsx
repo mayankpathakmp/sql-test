@@ -113,13 +113,17 @@ export default function App() {
   const activeQuestion = activeQueue[current];
   const answeredCount = Object.keys(answers).length;
   const correctCount = Object.values(answers).filter((item) => item.correct).length;
-  const effectiveScore = Math.max(correctCount - penalties, 0);
+  const wrongCount = Object.values(answers).filter((item) => item && item.selected !== null && !item.correct).length;
+  const skippedCount = Object.values(answers).filter((item) => item?.skipped).length;
+  const finalScore = correctCount - wrongCount - penalties;
+  const displayPct = activeQueue.length ? Math.max(0, Math.min(100, Math.round((finalScore / activeQueue.length) * 100))) : 0;
   const progressPercent = activeQueue.length ? (current / activeQueue.length) * 100 : 0;
   const timerMinutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+  const isQuizComplete = answeredCount === activeQueue.length;
   const timerSeconds = String(remainingSeconds % 60).padStart(2, '0');
 
   const gradeData = useMemo(() => {
-    const pct = Math.round((effectiveScore / activeQueue.length) * 100);
+    const pct = displayPct;
     if (pct >= 90) {
       return {
         grade: 'Excellent — mastery level',
@@ -151,7 +155,7 @@ export default function App() {
       color: '#ff7b72',
       pct,
     };
-  }, [correctCount, activeQueue.length]);
+  }, [displayPct]);
 
   const summaryBySection = useMemo(() => {
     const bySection = {};
@@ -167,6 +171,13 @@ export default function App() {
     });
     return Object.entries(bySection).filter(([, value]) => value.total > 0);
   }, [answers, activeQueue]);
+
+  const weakSections = useMemo(() => {
+    return summaryBySection
+      .map(([name, value]) => ({ name, ...value, pct: value.total ? value.correct / value.total : 0 }))
+      .filter((item) => item.pct < 1)
+      .sort((a, b) => a.pct - b.pct);
+  }, [summaryBySection]);
 
   const handleStart = () => {
     setActiveQueue(QUESTIONS);
@@ -355,7 +366,7 @@ export default function App() {
             <span className="btn-icon">⏱</span>
           </button>
           <span className="score-chip">
-            score <b id="live-score">{effectiveScore}</b>/<span id="live-answered">{answeredCount}</span>
+            score <b id="live-score">{finalScore}</b>/<span id="live-answered">{answeredCount}</span>
             {penalties > 0 ? <span className="penalty-chip"> −{penalties}</span> : null}
           </span>
         </div>
@@ -472,18 +483,81 @@ export default function App() {
               );
             })}
           </div>
+          {isQuizComplete ? (
+            weakSections.length > 0 ? (
+              <div className="weak-notice">
+                Focus first on: {weakSections.slice(0, 3).map((item) => item.name).join(', ')}.
+              </div>
+            ) : (
+              <div className="weak-notice">No weak sections detected — great work.</div>
+            )
+          ) : (
+            <div className="weak-notice">
+              Full weak-area recommendations are available after you complete the current quiz set.
+            </div>
+          )}
         </div>
 
-        <button className="review-toggle" id="review-toggle-btn" type="button" onClick={() => setShowReview(!showReview)}>
-          {showReview ? 'Hide full answer review ▴' : 'Show full answer review ▾'}
+        {isQuizComplete ? (
+          <>
+            <button className="review-toggle" id="review-toggle-btn" type="button" onClick={() => setShowReview(!showReview)}>
+              {showReview ? 'Hide full report ▴' : 'View full report ▾'}
+            </button>
+            <div id="review-wrap" className={showReview ? 'show' : ''}>
+              <div className="review-list" id="review-list">
+                {activeQueue.map((q) => {
+                  const answer = answers[q.num];
+                  const wasCorrect = answer?.correct;
+                  const yourText = answer?.selected ? q.options[LETTERS.indexOf(answer.selected)] : 'Skipped';
+                  const correctText = q.options[LETTERS.indexOf(q.answer)];
+                  const reasonText = q.explanation
+                    ? q.explanation
+                    : `Because this is a ${sectionFor(q.num).toLowerCase()} question, the correct choice is ${q.answer}) ${correctText}.`;
+                  return (
+                    <div className={`review-item ${wasCorrect ? 'right' : 'wrong'}`} key={q.num}>
+                      <div className="ri-head">
+                        <span>Q{q.num} · {sectionFor(q.num)}</span>
+                        <span>{wasCorrect ? '✓ correct' : '✗ review'}</span>
+                      </div>
+                      <div className="ri-q">{q.text}</div>
+                      {q.code ? (
+                        <div className="q-code review-code">
+                          <pre dangerouslySetInnerHTML={{ __html: highlightSQL(q.code) }} />
+                        </div>
+                      ) : null}
+                      <div className="ri-ans">
+                        <div className="review-row">
+                          <span className="ri-label">Your answer:</span>
+                          <span>{answer?.selected ? `${answer.selected}) ${yourText}` : 'Skipped'}</span>
+                        </div>
+                        <div className="review-row">
+                          <span className="ri-label">Correct answer:</span>
+                          <span>{q.answer}) {correctText}</span>
+                        </div>
+                        <div className="review-row reason">
+                          <span className="ri-label">Reason:</span>
+                          <span>{reasonText}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        ) : null}
+          {showReview ? 'Hide full report ▴' : 'View full report ▾'}
         </button>
         <div id="review-wrap" className={showReview ? 'show' : ''}>
           <div className="review-list" id="review-list">
             {activeQueue.map((q) => {
               const answer = answers[q.num];
               const wasCorrect = answer?.correct;
-              const yourText = answer ? q.options[LETTERS.indexOf(answer.selected)] : 'Skipped';
+              const yourText = answer?.selected ? q.options[LETTERS.indexOf(answer.selected)] : 'Skipped';
               const correctText = q.options[LETTERS.indexOf(q.answer)];
+              const reasonText = q.explanation
+                ? q.explanation
+                : `Because this is a ${sectionFor(q.num).toLowerCase()} question, the correct choice is ${q.answer}) ${correctText}.`;
               return (
                 <div className={`review-item ${wasCorrect ? 'right' : 'wrong'}`} key={q.num}>
                   <div className="ri-head">
@@ -491,12 +565,24 @@ export default function App() {
                     <span>{wasCorrect ? '✓ correct' : '✗ review'}</span>
                   </div>
                   <div className="ri-q">{q.text}</div>
+                  {q.code ? (
+                    <div className="q-code review-code">
+                      <pre dangerouslySetInnerHTML={{ __html: highlightSQL(q.code) }} />
+                    </div>
+                  ) : null}
                   <div className="ri-ans">
-                    {!wasCorrect && (
-                      <span className="yours">Your answer: {answer?.selected || '—'}) {yourText}</span>
-                    )}
-                    <br />
-                    <span className="correct">Correct: {q.answer}) {correctText}</span>
+                    <div className="review-row">
+                      <span className="ri-label">Your answer:</span>
+                      <span>{answer?.selected ? `${answer.selected}) ${yourText}` : 'Skipped'}</span>
+                    </div>
+                    <div className="review-row">
+                      <span className="ri-label">Correct answer:</span>
+                      <span>{q.answer}) {correctText}</span>
+                    </div>
+                    <div className="review-row reason">
+                      <span className="ri-label">Reason:</span>
+                      <span>{reasonText}</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -510,6 +596,9 @@ export default function App() {
           </button>
           <button className="btn" id="retry-wrong-btn" type="button" onClick={handleRetryWrong}>
             Retry missed questions only
+          </button>
+          <button className="btn" id="print-report-btn" type="button" onClick={() => window.print()}>
+            🖨 Print report
           </button>
         </div>
       </section>
