@@ -393,8 +393,9 @@ export default function App() {
           <button className="btn" id="prev-btn" type="button" onClick={handlePrev} disabled={current === 0}>
             ← Back
           </button>
-          <button className="btn" id="skip-btn" type="button" onClick={handleSkip} disabled={Boolean(currentAnswer)}>
-            Skip / 0
+          <button className="btn skip-btn" id="skip-btn" type="button" onClick={handleSkip} disabled={Boolean(currentAnswer)} aria-label="Skip question and mark as zero">
+            <span className="skip-label">Skip / 0</span>
+            <span className="skip-symbol" aria-hidden="true">⏭</span>
           </button>
           <button className="btn primary" id="next-btn" type="button" onClick={handleNext} disabled={!currentAnswer}>
             {current < activeQueue.length - 1 ? 'Next →' : 'Finish →'}

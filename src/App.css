@@ -217,6 +217,10 @@
     background:var(--panel-2); color:var(--text);
     transition: border-color .12s ease, transform .12s ease;
   }
+  .skip-btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .skip-symbol{ display:none; }
   .btn:hover{ border-color:var(--text-dim); }
   .btn:disabled{ opacity:0.35; cursor:not-allowed; }
   .btn.primary{
@@ -328,6 +332,9 @@
     .feedback-line{ font-size:12px; padding-top:12px; }
     .nav-row{ flex-direction:column; align-items:stretch; }
     .nav-row .btn{ width:100%; }
+    .skip-btn{ justify-content:center; }
+    .skip-label{ display:inline; }
+    .skip-symbol{ display:none; }
     .score-chip, .timer-chip{ font-size:11px; }
   }
 
